@@ -113,6 +113,11 @@ func (g *Graceless) Start(errCh, stopCh chan error) {
 	} else {
 		g.RegisterCommand(newGetPermsIdx(), permsGetCmd)
 	}
+	if permsDelCmd, err := newDelPerms(g.pm); err != nil {
+		errCh <- err
+	} else {
+		g.RegisterCommand(newDelPermsIdx(), permsDelCmd)
+	}
 
 	eventCh := make(chan accessors.MessageEvent)
 
@@ -134,10 +139,33 @@ func (g *Graceless) Start(errCh, stopCh chan error) {
 			return false
 		}
 
-		// If the command requires root privs and the user
-		// doesn't have them, don't run the command.
-		if idx.NeedsRoot() && !g.isRoot(user, errCh) {
-			return false
+		// Check the users perms before running any permissions
+		// based commands.
+		if perms := idx.RequiredPerms(); perms != nil {
+			// Root user's don't need individual perms.
+			if g.isRoot(user) {
+				return true
+			}
+
+			l := len(perms)
+
+			_perms, err := user.GetPerms()
+			if err != nil {
+				errCh <- err
+				return false
+			}
+
+			for _, perm := range perms {
+				for _, _perm := range _perms {
+					if _perm == perm {
+						l--
+					}
+				}
+			}
+
+			if l > 0 {
+				return false
+			}
 		}
 
 		return true
@@ -186,33 +214,79 @@ out:
 							// FIXME: don't show commands that the user doesn't have perms for.
 							var fields []string
 							for _, idx := range g.addCmdIdx {
-								fields = append(fields, idx.HelpShort())
+								if idx.Name() != "hidden" {
+									fields = append(fields, idx.HelpShort())
+								}
 							}
 							for _, idx := range g.getCmdIdx {
-								fields = append(fields, idx.HelpShort())
+								if idx.Name() != "hidden" {
+									fields = append(fields, idx.HelpShort())
+								}
 							}
 							for _, idx := range g.delCmdIdx {
-								fields = append(fields, idx.HelpShort())
+								if idx.Name() != "hidden" {
+									fields = append(fields, idx.HelpShort())
+								}
 							}
 							for _, idx := range g.genCmdIdx {
-								fields = append(fields, idx.HelpShort())
+								if idx.Name() != "hidden" {
+									fields = append(fields, idx.HelpShort())
+								}
 							}
 
 							// FIXME: help messages should always be returned in direct message.
 							if err := g.accessor.SendMessage(strings.Join(fields, "\n"), msg.Origin); err != nil {
 								errCh <- err
 							}
+
+							return
 						}
-						// TODO: implement help long functionality...
+
+						var helpMsg string
+						for _, idx := range g.addCmdIdx {
+							if name := idx.Name(); name != "hidden" && strings.Compare(cmd, name) == 0 {
+								helpMsg = g.addCmdMap[idx].Help()
+								break
+							}
+						}
+						if helpMsg == "" {
+							for _, idx := range g.getCmdIdx {
+								if name := idx.Name(); name != "hidden" && strings.Compare(cmd, name) == 0 {
+									helpMsg = g.getCmdMap[idx].Help()
+								}
+							}
+						}
+						if helpMsg == "" {
+							for _, idx := range g.delCmdIdx {
+								if name := idx.Name(); name != "hidden" && strings.Compare(cmd, name) == 0 {
+									helpMsg = g.delCmdMap[idx].Help()
+								}
+							}
+						}
+						if helpMsg == "" {
+							for _, idx := range g.genCmdIdx {
+								if name := idx.Name(); name != "hidden" && strings.Compare(cmd, name) == 0 {
+									helpMsg = g.genCmdMap[idx].Help()
+								}
+							}
+						}
+
+						if helpMsg != "" {
+							// FIXME: help messages should always be returned in direct message.
+							if err := g.accessor.SendMessage(helpMsg, msg.Origin); err != nil {
+								errCh <- err
+							}
+						}
 					}
 
-					if strings.Compare(cmdStr, "shutdown") == 0 && g.isRoot(user, errCh) {
+					// FIXME: implement these as standard commands.
+					if strings.Compare(cmdStr, "shutdown") == 0 && g.isRoot(user) {
 						g.log.Info("shutdown called")
 						stopCh <- errors.New("shutdown")
 						return
 					}
 
-					if prefix := "safemode"; strings.HasPrefix(cmdStr, prefix) && g.isRoot(user, errCh) {
+					if prefix := "safemode"; strings.HasPrefix(cmdStr, prefix) && g.isRoot(user) {
 						cmd := strings.TrimSpace(strings.TrimPrefix(cmdStr, prefix))
 						if strings.Compare(cmd, "true") == 0 {
 							g.config.Safemode = true
@@ -237,8 +311,8 @@ out:
 								return
 							}
 
-							if idx.Match(cmdStr) {
-								if err := g.addCmdMap[idx].Exec(user, g.accessor, cmdStr, msg); err != nil {
+							if str, ok := idx.Match(cmdStr); ok {
+								if err := g.addCmdMap[idx].Exec(user, g.accessor, str, msg); err != nil {
 									errCh <- err
 								}
 
@@ -259,8 +333,8 @@ out:
 								return
 							}
 
-							if idx.Match(cmdStr) {
-								if err := g.getCmdMap[idx].Exec(user, g.accessor, cmdStr, msg); err != nil {
+							if str, ok := idx.Match(cmdStr); ok {
+								if err := g.getCmdMap[idx].Exec(user, g.accessor, str, msg); err != nil {
 									errCh <- err
 								}
 
@@ -279,8 +353,8 @@ out:
 									return
 								}
 
-								if idx.Match(cmdStr) {
-									if err := g.delCmdMap[idx].Exec(user, g.accessor, cmdStr, msg); err != nil {
+								if str, ok := idx.Match(cmdStr); ok {
+									if err := g.delCmdMap[idx].Exec(user, g.accessor, str, msg); err != nil {
 										errCh <- err
 									}
 
@@ -294,8 +368,8 @@ out:
 					defer g.genCmdMu.RUnlock()
 
 					for _, idx := range g.genCmdIdx {
-						if idx.Match(cmdStr) {
-							if err := g.genCmdMap[idx].Exec(user, g.accessor, cmdStr, msg); err != nil {
+						if str, ok := idx.Match(cmdStr); ok {
+							if err := g.genCmdMap[idx].Exec(user, g.accessor, str, msg); err != nil {
 								errCh <- err
 							}
 						}
@@ -306,7 +380,6 @@ out:
 	}
 
 	g.log.Info("Shutting down...")
-	g.accessor.WG().Wait()
 	g.log.Info("Goodbye")
 }
 
@@ -340,7 +413,7 @@ func (g *Graceless) RegisterCommand(ci CommandIndex, cmd Command) {
 	}
 }
 
-func (g *Graceless) isRoot(user *permissions.User, errCh chan error) bool {
+func (g *Graceless) isRoot(user *permissions.User) bool {
 	// Not RootIDs are set, everyone can call shutdown.
 	if g.config.RootIDs == nil {
 		return true
@@ -348,18 +421,6 @@ func (g *Graceless) isRoot(user *permissions.User, errCh chan error) bool {
 
 	for _, id := range g.config.RootIDs {
 		if user.ID == id {
-			return true
-		}
-	}
-
-	if g.pm != nil {
-		ok, err := user.GetPerm("root")
-		if err != nil {
-			errCh <- err
-			return false
-		}
-
-		if ok {
 			return true
 		}
 	}

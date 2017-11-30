@@ -25,13 +25,15 @@ type (
 		// HelpShort returns the short help message.
 		HelpShort() string
 		// Match matches a string against a command.
-		Match(string) bool
-		// NoSafemode tells if a command can't be ran in safemode.
-		NoSafemode() bool
+		Match(string) (string, bool)
+		// Name returns the command name (for help purposes).
+		Name() string
 		// NeedsDB tells if a command requires a database connection to function.
 		NeedsDB() bool
-		// NeedsRoot tells if the command requires root privs to run.
-		NeedsRoot() bool // FIXME: replace with perms slice
+		// RequiredPerms returns the required permissions for the command.
+		RequiredPerms() []string
+		// NoSafemode tells if a command can't be ran in safemode.
+		NoSafemode() bool
 		// Type returns the command type.
 		Type() int
 	}
@@ -46,29 +48,35 @@ type (
 
 	// Index should be embedded into a struct wanting to implement CommandIndex.
 	Index struct {
-		noSafemode  bool
-		needsDB     bool
-		needsRoot   bool
-		commandType int
+		CmdName       string
+		CmdNoSafemode bool
+		CmdNeedsDB    bool
+		CmdPerms      []string
+		CommandType   int
 	}
 )
 
+// Name returns the command name (for help purposes).
+func (ci *Index) Name() string {
+	return ci.CmdName
+}
+
 // NoSafemode tells if a command can't be ran in safemode.
 func (ci *Index) NoSafemode() bool {
-	return ci.noSafemode
+	return ci.CmdNoSafemode
 }
 
 // NeedsDB tells if a command requires a database connection to function.
 func (ci *Index) NeedsDB() bool {
-	return ci.needsDB
+	return ci.CmdNeedsDB
 }
 
-// NeedsRoot tells if the command requires root privs to run.
-func (ci *Index) NeedsRoot() bool {
-	return ci.needsRoot
+// RequiredPerms returns the required permissions for the command.
+func (ci *Index) RequiredPerms() []string {
+	return ci.CmdPerms
 }
 
 // Type returns the command type.
 func (ci *Index) Type() int {
-	return ci.commandType
+	return ci.CommandType
 }
