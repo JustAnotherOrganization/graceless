@@ -10,6 +10,23 @@ import (
 )
 
 type (
+	// Shutdown, like the first command you should add right?
+	shutdownIndex struct {
+		*Index
+	}
+
+	shutdownCommand struct {
+		stopCh chan error
+	}
+
+	// Safemode gives us the ability to restrict commands with a safemode flag.
+	safemodeIndex struct {
+		*Index
+	}
+	safemodeCommand struct {
+		config *Config
+	}
+
 	// Perms because who doesn't like permissions?
 	addPermsIndex struct {
 		*Index
@@ -39,12 +56,87 @@ type (
 	}
 )
 
+func newShutdownIdx() *shutdownIndex {
+	return &shutdownIndex{
+		Index: &Index{
+			CmdName:  "hidden",
+			CmdPerms: []string{"shutdown"},
+		},
+	}
+}
+
+func newShutdownCommand(stopCh chan error) *shutdownCommand {
+	return &shutdownCommand{stopCh: stopCh}
+}
+
+func (*shutdownIndex) HelpShort() string {
+	return ""
+}
+
+func (*shutdownIndex) Match(str string) (string, bool) {
+	if strings.Compare(str, "shutdown") == 0 {
+		return str, true
+	}
+
+	return "", false
+}
+
+func (sh *shutdownCommand) Exec(user *permissions.User, acc accessors.Accessor, cmdStr string, ev accessors.MessageEvent) error {
+	sh.stopCh <- errors.New("shutdown")
+	return nil
+}
+
+func (*shutdownCommand) Help() string {
+	return ""
+}
+
+func newSafemodeIdx() *safemodeIndex {
+	return &safemodeIndex{
+		Index: &Index{
+			CmdName:  "hidden",
+			CmdPerms: []string{"safemode"},
+		},
+	}
+}
+
+func newSafemodeCommand(config *Config) *safemodeCommand {
+	return &safemodeCommand{config: config}
+}
+
+func (*safemodeIndex) HelpShort() string {
+	return ""
+}
+
+func (s *safemodeIndex) Match(str string) (string, bool) {
+	if prefix := "safemode"; strings.HasPrefix(str, prefix) {
+		return strings.TrimSpace(strings.TrimPrefix(str, prefix)), true
+	}
+
+	return str, false
+}
+
+func (sm *safemodeCommand) Exec(user *permissions.User, acc accessors.Accessor, cmdStr string, ev accessors.MessageEvent) error {
+	if strings.Compare(cmdStr, "true") == 0 {
+		sm.config.Safemode = true
+	}
+	if strings.Compare(cmdStr, "false") == 0 {
+		sm.config.Safemode = false
+	}
+
+	return acc.SendMessage(fmt.Sprintf("safemode: %v", sm.config.Safemode), ev.Origin)
+}
+
+func (*safemodeCommand) Help() string {
+	return ""
+}
+
 func newAddPermsIdx() *addPermsIndex {
 	return &addPermsIndex{
 		Index: &Index{
 			CmdName:     "add perm",
 			CmdNeedsDB:  true,
 			CommandType: AddCommand,
+			CmdPerms:    []string{"perms"},
 		},
 	}
 }
@@ -127,6 +219,7 @@ func newGetPermsIdx() *getPermsIndex {
 			CmdName:     "get perms",
 			CmdNeedsDB:  true,
 			CommandType: GetCommand,
+			CmdPerms:    []string{"perms"},
 		},
 	}
 }
@@ -213,6 +306,7 @@ func newDelPermsIdx() *delPermsIndex {
 			CmdName:     "del perm",
 			CmdNeedsDB:  true,
 			CommandType: DelCommand,
+			CmdPerms:    []string{"perms"},
 		},
 	}
 }

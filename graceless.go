@@ -2,7 +2,6 @@ package graceless
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 	"sync"
 
@@ -103,6 +102,8 @@ func New(accessor accessors.Accessor, log *logrus.Entry, config *Config, pm *per
 // Start our Graceless bot.
 func (g *Graceless) Start(errCh, stopCh chan error) {
 	// Register some default commands.
+	g.RegisterCommand(newShutdownIdx(), newShutdownCommand(stopCh))
+	g.RegisterCommand(newSafemodeIdx(), newSafemodeCommand(g.config))
 	if permsAddCmd, err := newAddPerms(g.pm); err != nil {
 		errCh <- err
 	} else {
@@ -211,24 +212,39 @@ out:
 								g.genCmdMu.RUnlock()
 							}()
 
-							// FIXME: don't show commands that the user doesn't have perms for.
 							var fields []string
 							for _, idx := range g.addCmdIdx {
+								if !preCheck(idx, user) {
+									continue
+								}
+
 								if idx.Name() != "hidden" {
 									fields = append(fields, idx.HelpShort())
 								}
 							}
 							for _, idx := range g.getCmdIdx {
+								if !preCheck(idx, user) {
+									continue
+								}
+
 								if idx.Name() != "hidden" {
 									fields = append(fields, idx.HelpShort())
 								}
 							}
 							for _, idx := range g.delCmdIdx {
+								if !preCheck(idx, user) {
+									continue
+								}
+
 								if idx.Name() != "hidden" {
 									fields = append(fields, idx.HelpShort())
 								}
 							}
 							for _, idx := range g.genCmdIdx {
+								if !preCheck(idx, user) {
+									continue
+								}
+
 								if idx.Name() != "hidden" {
 									fields = append(fields, idx.HelpShort())
 								}
@@ -244,6 +260,10 @@ out:
 
 						var helpMsg string
 						for _, idx := range g.addCmdIdx {
+							if !preCheck(idx, user) {
+								continue
+							}
+
 							if name := idx.Name(); name != "hidden" && strings.Compare(cmd, name) == 0 {
 								helpMsg = g.addCmdMap[idx].Help()
 								break
@@ -251,6 +271,10 @@ out:
 						}
 						if helpMsg == "" {
 							for _, idx := range g.getCmdIdx {
+								if !preCheck(idx, user) {
+									continue
+								}
+
 								if name := idx.Name(); name != "hidden" && strings.Compare(cmd, name) == 0 {
 									helpMsg = g.getCmdMap[idx].Help()
 								}
@@ -258,6 +282,10 @@ out:
 						}
 						if helpMsg == "" {
 							for _, idx := range g.delCmdIdx {
+								if !preCheck(idx, user) {
+									continue
+								}
+
 								if name := idx.Name(); name != "hidden" && strings.Compare(cmd, name) == 0 {
 									helpMsg = g.delCmdMap[idx].Help()
 								}
@@ -265,6 +293,10 @@ out:
 						}
 						if helpMsg == "" {
 							for _, idx := range g.genCmdIdx {
+								if !preCheck(idx, user) {
+									continue
+								}
+
 								if name := idx.Name(); name != "hidden" && strings.Compare(cmd, name) == 0 {
 									helpMsg = g.genCmdMap[idx].Help()
 								}
@@ -277,29 +309,6 @@ out:
 								errCh <- err
 							}
 						}
-					}
-
-					// FIXME: implement these as standard commands.
-					if strings.Compare(cmdStr, "shutdown") == 0 && g.isRoot(user) {
-						g.log.Info("shutdown called")
-						stopCh <- errors.New("shutdown")
-						return
-					}
-
-					if prefix := "safemode"; strings.HasPrefix(cmdStr, prefix) && g.isRoot(user) {
-						cmd := strings.TrimSpace(strings.TrimPrefix(cmdStr, prefix))
-						if strings.Compare(cmd, "true") == 0 {
-							g.config.Safemode = true
-						}
-						if strings.Compare(cmd, "false") == 0 {
-							g.config.Safemode = false
-						}
-
-						if err := g.accessor.SendMessage(fmt.Sprintf("safemode: %v", g.config.Safemode), msg.Origin); err != nil {
-							errCh <- err
-						}
-
-						return
 					}
 
 					if prefix := "add "; strings.HasPrefix(cmdStr, prefix) {
@@ -322,9 +331,6 @@ out:
 					}
 
 					if prefix := "get "; strings.HasPrefix(cmdStr, prefix) {
-
-						fmt.Println(cmdStr)
-
 						g.getCmdMu.RLock()
 						defer g.getCmdMu.RUnlock()
 
