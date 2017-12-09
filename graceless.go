@@ -102,22 +102,30 @@ func New(accessor accessors.Accessor, log *logrus.Entry, config *Config, pm *per
 // Start our Graceless bot.
 func (g *Graceless) Start(errCh, stopCh chan error) {
 	// Register some default commands.
-	g.RegisterCommand(newShutdownIdx(), newShutdownCommand(stopCh))
-	g.RegisterCommand(newSafemodeIdx(), newSafemodeCommand(g.config))
+	if shutdownCmd := newShutdownCommand(stopCh); shutdownCmd != nil {
+		g.RegisterCommand(shutdownCmd, shutdownCmd)
+	}
+	if safemodeCmd := newSafemodeCommand(g.config); safemodeCmd != nil {
+		g.RegisterCommand(safemodeCmd, safemodeCmd)
+	}
+	if whoisCmd := newUserIsCommand(); whoisCmd != nil {
+		g.RegisterCommand(whoisCmd, whoisCmd)
+	}
+
 	if permsAddCmd, err := newAddPerms(g.pm); err != nil {
 		errCh <- err
 	} else {
-		g.RegisterCommand(newAddPermsIdx(), permsAddCmd)
+		g.RegisterCommand(permsAddCmd, permsAddCmd)
 	}
 	if permsGetCmd, err := newGetPerms(g.pm); err != nil {
 		errCh <- err
 	} else {
-		g.RegisterCommand(newGetPermsIdx(), permsGetCmd)
+		g.RegisterCommand(permsGetCmd, permsGetCmd)
 	}
 	if permsDelCmd, err := newDelPerms(g.pm); err != nil {
 		errCh <- err
 	} else {
-		g.RegisterCommand(newDelPermsIdx(), permsDelCmd)
+		g.RegisterCommand(permsDelCmd, permsDelCmd)
 	}
 
 	eventCh := make(chan accessors.MessageEvent)
@@ -127,6 +135,10 @@ func (g *Graceless) Start(errCh, stopCh chan error) {
 	}()
 
 	preCheck := func(idx CommandIndex, user *permissions.User) bool {
+		if idx.Disabled() {
+			return false
+		}
+
 		// If we're in safemode don't run commands that have
 		// been marked flagged to not be reachable in safemode.
 		if g.config.Safemode && idx.NoSafemode() {
@@ -189,6 +201,13 @@ out:
 						errCh <- err
 						return
 					}
+					if user == nil {
+						user, err = g.pm.NewUser(msg.Sender.Id, msg.Sender.Name)
+						if err != nil {
+							errCh <- err
+							return
+						}
+					}
 				} else {
 					user = &permissions.User{
 						ID: msg.Sender.Id,
@@ -219,7 +238,7 @@ out:
 								}
 
 								if idx.Name() != "hidden" {
-									fields = append(fields, idx.HelpShort())
+									fields = append(fields, g.addCmdMap[idx].HelpShort())
 								}
 							}
 							for _, idx := range g.getCmdIdx {
@@ -228,7 +247,7 @@ out:
 								}
 
 								if idx.Name() != "hidden" {
-									fields = append(fields, idx.HelpShort())
+									fields = append(fields, g.getCmdMap[idx].HelpShort())
 								}
 							}
 							for _, idx := range g.delCmdIdx {
@@ -237,7 +256,7 @@ out:
 								}
 
 								if idx.Name() != "hidden" {
-									fields = append(fields, idx.HelpShort())
+									fields = append(fields, g.delCmdMap[idx].HelpShort())
 								}
 							}
 							for _, idx := range g.genCmdIdx {
@@ -246,7 +265,7 @@ out:
 								}
 
 								if idx.Name() != "hidden" {
-									fields = append(fields, idx.HelpShort())
+									fields = append(fields, g.genCmdMap[idx].HelpShort())
 								}
 							}
 
@@ -420,7 +439,7 @@ func (g *Graceless) RegisterCommand(ci CommandIndex, cmd Command) {
 }
 
 func (g *Graceless) isRoot(user *permissions.User) bool {
-	// Not RootIDs are set, everyone can call shutdown.
+	// No RootIDs are set, everyone can call shutdown.
 	if g.config.RootIDs == nil {
 		return true
 	}

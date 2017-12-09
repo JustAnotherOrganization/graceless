@@ -22,8 +22,6 @@ const (
 type (
 	// CommandIndex is used to track a Graceless command in a map.
 	CommandIndex interface {
-		// HelpShort returns the short help message.
-		HelpShort() string
 		// Match matches a string against a command.
 		Match(string) (string, bool)
 		// Name returns the command name (for help purposes).
@@ -36,12 +34,16 @@ type (
 		NoSafemode() bool
 		// Type returns the command type.
 		Type() int
+		// Disabled returns whether the command is disabled.
+		Disabled() bool
 	}
 
 	// Command is a Graceless command.
 	Command interface {
 		// Exec executes a given command returning any errors.
 		Exec(user *permissions.User, acc accessors.Accessor, cmdStr string, ev accessors.MessageEvent) error
+		// HelpShort returns the short help message.
+		HelpShort() string
 		// Help returns the commands help message.
 		Help() string
 	}
@@ -53,6 +55,7 @@ type (
 		CmdNeedsDB    bool
 		CmdPerms      []string
 		CommandType   int
+		CmdDisabled   bool
 	}
 )
 
@@ -79,4 +82,9 @@ func (ci *Index) RequiredPerms() []string {
 // Type returns the command type.
 func (ci *Index) Type() int {
 	return ci.CommandType
+}
+
+// Disabled returns whether the command is disabled.
+func (ci *Index) Disabled() bool {
+	return ci.CmdDisabled
 }
