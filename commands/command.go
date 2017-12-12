@@ -1,8 +1,7 @@
-package graceless
+package commands
 
 import (
 	"github.com/justanotherorganization/justanotherbotkit/accessors"
-	"github.com/justanotherorganization/justanotherbotkit/permissions"
 )
 
 // FIXME: thiu really is terribad...
@@ -17,6 +16,9 @@ const (
 	// DelCommand should be set as the Command type in a "del", "delete", "rm",
 	// or "remove" prefixed command.
 	DelCommand
+	// EngineCommand is a special case for commands that run on an external
+	// engine.
+	EngineCommand
 )
 
 type (
@@ -41,7 +43,7 @@ type (
 	// Command is a Graceless command.
 	Command interface {
 		// Exec executes a given command returning any errors.
-		Exec(user *permissions.User, acc accessors.Accessor, cmdStr string, ev accessors.MessageEvent) error
+		Exec(acc accessors.Accessor, cmdStr string, ev accessors.MessageEvent) error
 		// HelpShort returns the short help message.
 		HelpShort() string
 		// Help returns the commands help message.
