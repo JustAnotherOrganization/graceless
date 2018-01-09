@@ -9,6 +9,7 @@ import (
 	//"github.com/justanotherorganization/graceless/db"
 
 	"github.com/justanotherorganization/graceless/commands"
+	"github.com/justanotherorganization/graceless/commands/engines"
 	"github.com/justanotherorganization/graceless/commands/engines/golang"
 	"github.com/justanotherorganization/graceless/commands/engines/js"
 	"github.com/justanotherorganization/graceless/config"
@@ -614,15 +615,23 @@ func registerDefaultCommands(g *Graceless, stopCh chan error) error {
 	}
 	g.RegisterCommand(permsDelCmd, permsDelCmd)
 
-	if g.config.WithGoEngine {
-		if goengineCmd := golang.NewEngineCommand(); goengineCmd != nil {
-			g.RegisterCommand(goengineCmd, goengineCmd)
+	if engines.FoundSed {
+		if sedCmd := engines.NewSedCommand(); sedCmd != nil {
+			g.RegisterCommand(sedCmd, sedCmd)
 		}
 	}
 
 	if g.config.WithJSEngine {
 		if jsengineCmd := js.NewEngineCommand(); jsengineCmd != nil {
 			g.RegisterCommand(jsengineCmd, jsengineCmd)
+		}
+	}
+
+	if g.config.WithGoEngine {
+		if goengineCmd, err := golang.NewEngineCommand(); err != nil {
+			return err
+		} else if goengineCmd != nil {
+			g.RegisterCommand(goengineCmd, goengineCmd)
 		}
 	}
 

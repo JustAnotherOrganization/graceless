@@ -23,18 +23,31 @@ type (
 	// EngineCommand gives a bot access to run something in Go.
 	EngineCommand struct {
 		*commands.Index
+		goBinary string
 	}
 )
 
 // NewEngineCommand returns a new graceless.Command
-func NewEngineCommand() *EngineCommand {
-	return &EngineCommand{
-		Index: &commands.Index{
-			CmdName:     "hidden",
-			CmdPerms:    []string{"go"},
-			CommandType: commands.EngineCommand,
-		},
+func NewEngineCommand() (*EngineCommand, error) {
+	cmd := exec.Command("which", "go")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if err := cmd.Run(); err != nil {
+		return nil, errors.Wrap(err, "cmd.Run")
 	}
+
+	if str := out.String(); str != "" {
+		return &EngineCommand{
+			Index: &commands.Index{
+				CmdName:     "hidden",
+				CmdPerms:    []string{"go"},
+				CommandType: commands.EngineCommand,
+			},
+			goBinary: strings.TrimSuffix(str, "\n"),
+		}, nil
+	}
+
+	return nil, nil
 }
 
 // Match matches a string against the go run command.
@@ -70,16 +83,12 @@ func (g *EngineCommand) Exec(acc accessors.Accessor, cmdStr string, ev accessors
 	}
 
 	// Write a file for our go code to be built from.
-	// FIXME: this belongs in it's own container with the go runtime.
 	fileName := fmt.Sprintf("/tmp/graceless_%s.go", uuid.NewV4().String())
 	if err := ioutil.WriteFile(fileName, []byte(cmdStr), 0770); err != nil {
 		return errors.Wrap(err, "ioutil.WriteFile")
 	}
 
-	// FIXME: see above.
-	// TODO: detect go location during startup, disable command (allowing bot
-	// to start without it) if not found.
-	cmd := exec.Command("/usr/bin/go", "run", fileName)
+	cmd := exec.Command(g.goBinary, "run", fileName)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
