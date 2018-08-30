@@ -1,1 +1,1 @@
-![image](/gopher.png?raw=true)
+![image](/gopher.png)
