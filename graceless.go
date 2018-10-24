@@ -10,6 +10,8 @@ import (
 	"github.com/justanotherorganization/justanotherbotkit/commands"
 	"github.com/justanotherorganization/justanotherbotkit/proto"
 	"github.com/justanotherorganization/justanotherbotkit/transport"
+	"github.com/justanotherorganization/l5424"
+	"github.com/justanotherorganization/l5424/x5424"
 	"github.com/pkg/errors"
 )
 
@@ -39,7 +41,7 @@ func (g *Graceless) Start(ctx context.Context, cancel context.CancelFunc, errCh 
 		startMsg += " in safemode"
 	}
 
-	g.config.Log.Info(startMsg)
+	g.config.Log(x5424.Severity, l5424.InfoLvl, startMsg)
 
 	// Start building our database (as early as possible).
 	if !g.Safemode() {
@@ -146,7 +148,7 @@ func (g *Graceless) Start(ctx context.Context, cancel context.CancelFunc, errCh 
 		case ev := <-eventCh:
 			// Handle messages in their own goroutines so they don't block.
 			go func(ev *transport.Event) {
-				g.config.Log.Debugf("%s (%s): %v", ev.Origin.Sender.Name, ev.Origin.Sender.ID, ev.Body)
+				g.config.Log(x5424.Severity, l5424.DebugLvl, "%s (%s): %v", ev.Origin.Sender.Name, ev.Origin.Sender.ID, ev.Body)
 
 				if ev.Origin.Sender.ID == "USLACKBOT" {
 					return
@@ -210,8 +212,8 @@ func (g *Graceless) Start(ctx context.Context, cancel context.CancelFunc, errCh 
 		}
 	}
 
-	g.config.Log.Info("Shutting down...")
-	g.config.Log.Info("Goodbye")
+	g.config.Log(x5424.Severity, l5424.InfoLvl, "Shutting down...")
+	g.config.Log(x5424.Severity, l5424.InfoLvl, "Goodbye")
 }
 
 // Safemode returns whather we are currently running in safemode.

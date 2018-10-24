@@ -3,7 +3,8 @@ package config
 import (
 	"github.com/justanotherorganization/justanotherbotkit/transport"
 	"github.com/justanotherorganization/justanotherbotkit/users"
-	"github.com/sirupsen/logrus"
+	"github.com/justanotherorganization/l5424"
+	"github.com/justanotherorganization/l5424/x5424"
 )
 
 // TODO: implement text marshallers for different message types.
@@ -23,6 +24,7 @@ Lastly, just to warn you, I'm really clumsy!`
 type (
 	// Config is the config for a graceless bot.
 	Config struct {
+		l5424.Logger
 		// RootUsers contains the valid users who have root access to the bot.
 		RootUsers []string
 		// CmdPrefix is the prefix to match on for recognizing commands.
@@ -40,8 +42,6 @@ type (
 		DisableIntro bool
 		// Transport is the network transport.
 		Transport transport.Transport
-		// Log is a logrus.Entry (this will be replaced very very soon).
-		Log *logrus.Entry
 		// UserDB is a users.DB.
 		UserDB users.DB
 	}
@@ -54,8 +54,8 @@ func (c *Config) Validate() error {
 		return transport.ErrNilTransport
 	}
 
-	if c.Log == nil {
-		c.Log = logrus.NewEntry(logrus.New())
+	if c.Logger == nil {
+		c.Logger = x5424.New(l5424.InfoLvl.String(), nil)
 	}
 
 	if c.UserDB == nil {
