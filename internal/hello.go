@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/justanotherorganization/graceless/commands"
 	"github.com/justanotherorganization/graceless/config"
-	"github.com/justanotherorganization/graceless/internal/commands"
 	"github.com/justanotherorganization/justanotherbotkit/transport"
 	"github.com/pkg/errors"
 )

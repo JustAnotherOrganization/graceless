@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
-	cmds "github.com/justanotherorganization/graceless/internal/commands"
+	cmds "github.com/justanotherorganization/graceless/commands"
 	"github.com/justanotherorganization/justanotherbotkit/commands"
 	"github.com/justanotherorganization/justanotherbotkit/transport"
 	"github.com/pkg/errors"
