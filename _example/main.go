@@ -17,7 +17,7 @@ import (
 	"github.com/justanotherorganization/l5424/x5424"
 
 	// Import the commands we want to be registered.
-	_ "github.com/justanotherorganization/graceless/internal/commands/sed"
+	_ "github.com/justanotherorganization/graceless/commands/sed"
 )
 
 var (
@@ -49,7 +49,7 @@ func init() {
 	}
 
 	if slackToken == "" {
-		logger.Log(x5424.Severity, l5424.EmergencyLvl, "Slack token must be set")
+		logger.Log(x5424.Severity, l5424.EmergencyLvl, "Slack token must be set\n")
 		os.Exit(1)
 	}
 
@@ -108,13 +108,12 @@ func main() {
 			case <-ctx.Done():
 				return
 			case <-signals:
-				logger.Log(x5424.Severity, l5424.InfoLvl, "Exiting...")
 				cancel()
 				return
 			case err := <-errCh:
 				if err != nil {
 					// For now treat all errors as non-fatal.
-					logger.Log(x5424.Severity, l5424.ErrorLvl, err)
+					logger.Log(x5424.Severity, l5424.ErrorLvl, err, "\n")
 				}
 			}
 		}

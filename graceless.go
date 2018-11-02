@@ -4,9 +4,9 @@ import (
 	"context"
 	"strings"
 
+	cmds "github.com/justanotherorganization/graceless/commands"
 	"github.com/justanotherorganization/graceless/config"
 	"github.com/justanotherorganization/graceless/internal"
-	cmds "github.com/justanotherorganization/graceless/internal/commands"
 	"github.com/justanotherorganization/justanotherbotkit/commands"
 	"github.com/justanotherorganization/justanotherbotkit/proto"
 	"github.com/justanotherorganization/justanotherbotkit/transport"
@@ -41,7 +41,7 @@ func (g *Graceless) Start(ctx context.Context, cancel context.CancelFunc, errCh 
 		startMsg += " in safemode"
 	}
 
-	g.config.Log(x5424.Severity, l5424.InfoLvl, startMsg)
+	g.config.Log(x5424.Severity, l5424.InfoLvl, startMsg, "\n")
 
 	// Start building our database (as early as possible).
 	if !g.Safemode() {
@@ -212,8 +212,8 @@ func (g *Graceless) Start(ctx context.Context, cancel context.CancelFunc, errCh 
 		}
 	}
 
-	g.config.Log(x5424.Severity, l5424.InfoLvl, "Shutting down...")
-	g.config.Log(x5424.Severity, l5424.InfoLvl, "Goodbye")
+	g.config.Log(x5424.Severity, l5424.InfoLvl, "Shutting down...\n")
+	g.config.Log(x5424.Severity, l5424.InfoLvl, "Goodbye\n")
 }
 
 // Safemode returns whather we are currently running in safemode.
