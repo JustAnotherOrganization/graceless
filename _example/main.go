@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"os"
+	"os/signal"
 	"strings"
 
 	"github.com/justanotherorganization/graceless"
@@ -12,7 +13,8 @@ import (
 	"github.com/justanotherorganization/justanotherbotkit/transport/slack"
 	"github.com/justanotherorganization/justanotherbotkit/users"
 	"github.com/justanotherorganization/justanotherbotkit/users/bolt"
-	"github.com/sirupsen/logrus"
+	"github.com/justanotherorganization/l5424"
+	"github.com/justanotherorganization/l5424/x5424"
 
 	// Import the commands we want to be registered.
 	_ "github.com/justanotherorganization/graceless/internal/commands/sed"
@@ -22,12 +24,11 @@ var (
 	slackToken string
 	dbPath     string
 	rootUsers  []string
-
-	log *logrus.Entry
+	logger     *x5424.Logger
 )
 
 func init() {
-	log = logrus.NewEntry(logrus.New())
+	logger = x5424.New(l5424.InfoLvl.String(), nil)
 
 	flag.StringVar(&slackToken, "st", "", "Slack token")
 	flag.StringVar(&dbPath, "db", "", "User database path")
@@ -48,7 +49,8 @@ func init() {
 	}
 
 	if slackToken == "" {
-		log.Fatal("Slack token must be set")
+		logger.Log(x5424.Severity, l5424.EmergencyLvl, "Slack token must be set")
+		os.Exit(1)
 	}
 
 	if _rootUsers != "" {
@@ -67,7 +69,7 @@ func main() {
 			File: dbPath,
 		})
 		if err != nil {
-			log.Error(err)
+			logger.Log(x5424.Severity, l5424.EmergencyLvl, err)
 			return
 		}
 	}
@@ -77,34 +79,42 @@ func main() {
 		IgnoreUsers: []string{"keeper"},
 	})
 	if err != nil {
-		log.Error(err)
+		logger.Log(x5424.Severity, l5424.EmergencyLvl, err)
 		return
 	}
 
 	g, err := graceless.New(&config.Config{
 		RootUsers: rootUsers,
 		CmdPrefix: config.DefaultCommandPrefix,
-		Log:       log,
+		Logger:    logger,
 		Transport: slack,
 		UserDB:    db,
 	})
 	if err != nil {
-		log.Error(err)
+		logger.Log(x5424.Severity, l5424.EmergencyLvl, err)
 		return
 	}
 
 	errCh := make(chan error)
 	ctx, cancel := context.WithCancel(context.Background())
 
+	// Start signal handler
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt)
+
 	go func() {
-		for stop := false; !stop; {
+		for {
 			select {
 			case <-ctx.Done():
-				stop = true
+				return
+			case <-signals:
+				logger.Log(x5424.Severity, l5424.InfoLvl, "Exiting...")
+				cancel()
+				return
 			case err := <-errCh:
 				if err != nil {
 					// For now treat all errors as non-fatal.
-					log.Error(err)
+					logger.Log(x5424.Severity, l5424.ErrorLvl, err)
 				}
 			}
 		}
