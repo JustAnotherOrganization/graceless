@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 
 	"github.com/justanotherorganization/graceless"
 	"github.com/justanotherorganization/graceless/config"
@@ -69,7 +70,7 @@ func main() {
 			File: dbPath,
 		})
 		if err != nil {
-			logger.Log(x5424.Severity, l5424.EmergencyLvl, err)
+			logger.Log(x5424.Severity, l5424.EmergencyLvl, err.Error(), "\n")
 			return
 		}
 	}
@@ -79,7 +80,7 @@ func main() {
 		IgnoreUsers: []string{"keeper"},
 	})
 	if err != nil {
-		logger.Log(x5424.Severity, l5424.EmergencyLvl, err)
+		logger.Log(x5424.Severity, l5424.EmergencyLvl, err.Error(), "\n")
 		return
 	}
 
@@ -91,7 +92,7 @@ func main() {
 		UserDB:    db,
 	})
 	if err != nil {
-		logger.Log(x5424.Severity, l5424.EmergencyLvl, err)
+		logger.Log(x5424.Severity, l5424.EmergencyLvl, err.Error(), "\n")
 		return
 	}
 
@@ -102,7 +103,11 @@ func main() {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt)
 
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
+
 		for {
 			select {
 			case <-ctx.Done():
@@ -113,11 +118,12 @@ func main() {
 			case err := <-errCh:
 				if err != nil {
 					// For now treat all errors as non-fatal.
-					logger.Log(x5424.Severity, l5424.ErrorLvl, err, "\n")
+					logger.Log(x5424.Severity, l5424.ErrorLvl, err.Error(), "\n")
 				}
 			}
 		}
 	}()
 
 	g.Start(ctx, cancel, errCh)
+	wg.Wait()
 }
