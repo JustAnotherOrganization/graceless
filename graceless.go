@@ -48,19 +48,16 @@ func (g *Graceless) Start(ctx context.Context, cancel context.CancelFunc, errCh 
 		cmds.SetUserDB(g.config.UserDB)
 
 		go func() {
-			// We wouldn't be building the database if we hadn't passed in
-			// a backend so treat errors in this instance as fatal.
-			users, err := g.config.Transport.GetUsers()
-			if err != nil {
-				errCh <- err
-				cancel()
-				return
-			}
-
-			for _, user := range users {
-				// This probably needs to be expanded a bit.
-				if user.GetID() == "USLACKBOT" {
-					continue
+			// Create users for our admins, anyone else will get created when they speak.
+			// if they don't speak, there's no reason for them to be in the database anyway.
+			for _, rootUser := range g.config.RootUsers {
+				// We wouldn't be building the database if we hadn't passed in
+				// a backend so treat errors in this instance as fatal.
+				user, err := g.config.Transport.GetUser(rootUser)
+				if err != nil {
+					errCh <- err
+					cancel()
+					return
 				}
 
 				_user, err := g.config.UserDB.GetUser(context.Background(), user.GetID())
@@ -79,27 +76,25 @@ func (g *Graceless) Start(ctx context.Context, cancel context.CancelFunc, errCh 
 					}
 				}
 
-				for _, rootUser := range g.config.RootUsers {
-					if _user.GetID() == rootUser ||
-						strings.EqualFold(_user.GetName(), rootUser) {
-						isSet := false
-						for _, p := range _user.GetPermissions() {
-							if p == "root" {
-								isSet = true
-								break
-							}
+				if _user.GetID() == rootUser ||
+					strings.EqualFold(_user.GetName(), rootUser) {
+					isSet := false
+					for _, p := range _user.GetPermissions() {
+						if p == "root" {
+							isSet = true
+							break
 						}
+					}
 
-						if !isSet {
-							// Update our transport.User.BaseUser with the contents from our database saved user.
-							user.BaseUser = _user.(*pb.BaseUser)
-							user.Permissions = append(user.Permissions, "root")
-							_, err := g.config.UserDB.UpdateUser(context.Background(), user)
-							if err != nil {
-								errCh <- err
-								cancel()
-								return
-							}
+					if !isSet {
+						// Update our transport.User.BaseUser with the contents from our database saved user.
+						user.BaseUser = _user.(*pb.BaseUser)
+						user.Permissions = append(user.Permissions, "root")
+						_, err := g.config.UserDB.UpdateUser(context.Background(), user)
+						if err != nil {
+							errCh <- err
+							cancel()
+							return
 						}
 					}
 				}
@@ -168,7 +163,7 @@ func (g *Graceless) Start(ctx context.Context, cancel context.CancelFunc, errCh 
 					}
 
 					if _user == nil {
-						_, err = g.config.UserDB.CreateUser(context.Background(), user)
+						_user, err = g.config.UserDB.CreateUser(context.Background(), user)
 						if err != nil {
 							errCh <- errors.Wrap(err, "config.UserDB.CreateUser")
 							return
@@ -187,7 +182,7 @@ func (g *Graceless) Start(ctx context.Context, cancel context.CancelFunc, errCh 
 						user.Permissions = append(user.Permissions, "hello")
 						_, err := g.config.UserDB.UpdateUser(context.Background(), user)
 						if err != nil {
-							errCh <- err
+							errCh <- errors.Wrap(err, "config.UserDB.UpdateUser")
 							// Don't return, we still want the command to get processed...
 						}
 					}
