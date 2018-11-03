@@ -4,21 +4,12 @@ import (
 	"github.com/justanotherorganization/justanotherbotkit/transport"
 	"github.com/justanotherorganization/justanotherbotkit/users"
 	"github.com/justanotherorganization/l5424"
-	"github.com/justanotherorganization/l5424/x5424"
 )
 
 // TODO: implement text marshallers for different message types.
 const (
 	// DefaultCommandPrefix is the default command prefix.
 	DefaultCommandPrefix = `.`
-
-	defaultIntroStart  = `Hi! I just wanted to introduce myself, I'm a graceless chat bot.`
-	defaultIntroFinish = `If you want to know what they are just type [tag][prefix]help[tag] in any channel
-and I'll respond to you here. Lastly, just to warn you, I'm really clumsy!`
-
-	temporaryIntroFinish = `Sadly my help command is totally borked currently too, but if you'd like to help
-with fixing it you can get the link to my source using [tag][prefix]source[tag].
-Lastly, just to warn you, I'm really clumsy!`
 )
 
 type (
@@ -31,15 +22,11 @@ type (
 		CmdPrefix string
 		// Safemode sets the bot into safemode.
 		Safemode bool
-		// Intro allows for settings a custom bot introduction (if not provided
-		// a default will be used).
-		IntroStart string
-		// IntroFinish is the end of the bot introduction (if not provided a
-		// default will be used).
-		IntroFinish string
 		// DisableIntro allows for disabling the introduction entirely,
 		// by default this is false.
 		DisableIntro bool
+		// HelloFunc is the function executed to say hello to new users.
+		HelloFunc func(user *transport.User, conf *Config) error
 		// Transport is the network transport.
 		Transport transport.Transport
 		// UserDB is a users.DB.
@@ -55,21 +42,17 @@ func (c *Config) Validate() error {
 	}
 
 	if c.Logger == nil {
-		c.Logger = x5424.New(l5424.InfoLvl.String(), nil)
+		c.Logger = &l5424.NoOpLogger{}
 	}
 
 	if c.UserDB == nil {
 		c.Safemode = true
 	}
 
-	if c.IntroStart == "" {
-		c.IntroStart = defaultIntroStart
-	}
-
-	if c.IntroFinish == "" {
-		// FIXME:
-		//c.IntroFinish = defaultIntroFinish
-		c.IntroFinish = temporaryIntroFinish
+	if !c.DisableIntro {
+		if c.HelloFunc == nil {
+			c.HelloFunc = defaultSayHelloF
+		}
 	}
 
 	return nil

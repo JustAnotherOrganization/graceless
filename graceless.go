@@ -179,7 +179,7 @@ func (g *Graceless) Start(ctx context.Context, cancel context.CancelFunc, errCh 
 					user.BaseUser = _user.(*pb.BaseUser)
 					saidHello, err := internal.SayHello(user, g.config)
 					if err != nil {
-						errCh <- err
+						errCh <- errors.Wrap(err, "internal.SayHello")
 						// Don't return, we still want the command to get processed...
 					}
 
