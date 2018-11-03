@@ -114,13 +114,6 @@ func (g *Graceless) Start(ctx context.Context, cancel context.CancelFunc, errCh 
 
 	cmds.Register(
 		&commands.Command{
-			Use:   "source",
-			Short: "Graceless source code",
-			ExecFunc: func(ev *transport.Event) error {
-				return ev.Transport.SendMessage(ev.Origin.ID, "github.com/justanotherorganization/graceless")
-			},
-		},
-		&commands.Command{
 			Use:    "shutdown",
 			Short:  "Shutdown the bot",
 			Hidden: true,

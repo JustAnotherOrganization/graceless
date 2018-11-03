@@ -19,6 +19,7 @@ import (
 
 	// Import the commands we want to be registered.
 	_ "github.com/justanotherorganization/graceless/commands/sed"
+	_ "github.com/justanotherorganization/graceless/commands/source"
 )
 
 var (
